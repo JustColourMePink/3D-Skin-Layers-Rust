@@ -1,0 +1,162 @@
+# 3D Skin Layers for Horizon: a port of tr7zw's 3D Skin Layers (NeoForge 1.11.4, MC 26.3).
+# Original by tr7zw, under the tr7zw Protective License (see LICENSE-skinlayers3d.txt):
+# free, non-commercial use only.
+[mod]
+id = "skin_layers_3d"
+version = "0.2.1"
+priority = 100
+
+[compatibility]
+horizon_revision = "66f3981f522b24c250b21523a70080965b940424"
+
+# The voxel builder, the settings and the head models: in the render crate,
+# which the game crate depends on, so both halves (and the skull and item
+# renderers) use them.
+[[module]]
+id = "core"
+file = "crates/horizon-client-render/src/lib.rs"
+name = "skin_layers_3d_core"
+source = "src/core.rs"
+visibility = "pub"
+
+# Everything the hooks call: the voxel builder, the config and the model caches.
+# A child of `crate::game`, so it reads the game's own fields.
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "skin_layers_3d"
+source = "src/runtime.rs"
+
+# The model Horizon's 3D skin layers option would build: ours instead, for
+# every player (remote players, the local player's own model).
+[[injection]]
+id = "model"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::remote::Game<'_>::skin_3d_model"
+helper = "hooks/model.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "kind", ty = "&std::sync::Arc<horizon_client::mobs::MobType>", value = "kind" },
+  { name = "skin", ty = "&str", value = "skin" },
+  { name = "slim", ty = "bool", value = "slim" },
+]
+
+# The first-person arm with a 3D sleeve.
+[[injection]]
+id = "arm"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::Game<'_>::first_person_arm"
+helper = "hooks/arm.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "left", ty = "bool", value = "left" },
+  { name = "matrix", ty = "glam::Mat4", value = "m" },
+  { name = "light", ty = "u32", value = "light" },
+  { name = "out", ty = "&mut Vec<horizon_client::mesher::Vertex>", value = "&mut *out" },
+]
+
+# Once a frame: the level of detail by distance, and settings changes.
+[[injection]]
+id = "frame"
+hook = "frame"
+hook_version = 1
+kind = "HEAD"
+helper = "hooks/frame.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# Options > Mods: the entry and its settings page.
+[[injection]]
+id = "list"
+hook = "mods"
+hook_version = 1
+kind = "HEAD"
+helper = "hooks/list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::mod_api::NativeMod>", value = "&mut *mods" },
+]
+
+[[injection]]
+id = "settings"
+hook = "settings"
+hook_version = 1
+kind = "HEAD"
+helper = "hooks/settings.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+[[injection]]
+id = "click"
+hook = "settings_click"
+hook_version = 1
+kind = "HEAD"
+helper = "hooks/click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]
+
+# Every decoded skin, mirrored for the head renderers.
+[[injection]]
+id = "remember"
+kind = "HEAD"
+target = "horizon_client_render::skins::Downloader::remember"
+helper = "hooks/remember.rs"
+bindings = [
+  { name = "location", ty = "&str", value = "&location" },
+  { name = "rgba", ty = "&[u8]", value = "&rgba" },
+]
+
+# Placed player heads: the skull branch's model, swapped where it is drawn.
+# (The branch itself is in a function with closures, which site hooks refuse.)
+[[injection]]
+id = "skull"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::block_entity_render::draw_part"
+helper = "hooks/skull.rs"
+bindings = [
+  { name = "part", ty = "&crate::block_entity_render::ModelPart", value = "part" },
+  { name = "name", ty = "&str", value = "name" },
+  { name = "parent", ty = "glam::Mat4", value = "parent" },
+  { name = "adjust", ty = "&dyn Fn(&str, &mut [f32; 9])", value = "adjust" },
+  { name = "paint", ty = "crate::block_entity_render::Paint", value = "paint" },
+  { name = "out", ty = "&mut Vec<crate::mesher::Vertex>", value = "&mut *out" },
+]
+
+# Player head items: `PlayerHeadSpecialRenderer`'s model, swapped the same way.
+[[injection]]
+id = "head_item"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::item_render::special::draw"
+helper = "hooks/head_item.rs"
+bindings = [
+  { name = "part", ty = "&crate::block_entity_render::ModelPart", value = "part" },
+  { name = "name", ty = "&str", value = "name" },
+  { name = "parent", ty = "glam::Mat4", value = "parent" },
+  { name = "adjust", ty = "&dyn Fn(&str, &mut [f32; 9])", value = "adjust" },
+  { name = "sprite", ty = "crate::hud::Rect", value = "sprite" },
+  { name = "color", ty = "u32", value = "color" },
+  { name = "foil", ty = "crate::item_render::Foil", value = "foil" },
+  { name = "sink", ty = "&mut dyn crate::item_render::ItemSink", value = "&mut *sink" },
+]
+
+# The settings page: the six part switches two to a row.
+[[injection]]
+id = "pair"
+kind = "RETURN"
+target = "horizon_client_render::options_ui::OptionsUi::native_rows"
+helper = "hooks/pair.rs"
+bindings = [
+  { name = "value", ty = "Vec<Row>", value = "$value" },
+  { name = "s", ty = "&Settings", value = "s" },
+  { name = "i", ty = "usize", value = "i" },
+]

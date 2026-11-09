@@ -1,0 +1,9 @@
+# Build output (attach the .hnmod to a GitHub release instead)
+dist/
+
+# The original mod's jar: tr7zw's file, not ours to redistribute
+*.jar
+
+__pycache__/
+*.pyc
+target/
